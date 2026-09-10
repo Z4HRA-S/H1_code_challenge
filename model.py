@@ -36,7 +36,8 @@ class Group(Base):
     __tablename__ = "group"
 
     group_id: Mapped[str] = mapped_column(String, primary_key=True)
-    version: Mapped[int] = mapped_column(Integer, default=1)
+    group_name: Mapped[str] = mapped_column(String, index=True)
+    version: Mapped[int] = mapped_column(Integer)
     status: Mapped[GroupStatus] = mapped_column(String)
 
 
@@ -50,11 +51,15 @@ class Node(Base):
 class Operation(Base):
     __tablename__ = "operation"
 
-    operation_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    operation_id: Mapped[int] = mapped_column(
+        Integer, primary_key=True, autoincrement=True
+    )
     group_id: Mapped[str] = mapped_column(ForeignKey("group.group_id"))
     operation: Mapped[OperationType] = mapped_column(String)
     overall_status: Mapped[OverallStatus] = mapped_column(String)
-    timestamp: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    timestamp: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.utcnow
+    )
 
 
 class NodeOperation(Base):
