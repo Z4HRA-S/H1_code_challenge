@@ -11,7 +11,6 @@ class GroupOperation:
             "operation_result": [],
             "rollback": None,
             "rollback_result": [],
-            "current_state": None,
             "overall_state": None,
         }
 
@@ -51,13 +50,14 @@ class GroupOperation:
                 state = "not_created"
             elif get_response.status_code == 200:
                 state = "created"
+
             else:
                 state = "unknown"
 
             return {
                 "node": node,
                 "state": state,
-                "success": False,
+                "success": True if state=="created" else False,
             }
 
         if method == "delete":
@@ -80,7 +80,7 @@ class GroupOperation:
             return {
                 "node": node,
                 "state": state,
-                "success": False,
+                "success": True if state=="deleted" else False,
             }
 
         return {
@@ -109,15 +109,15 @@ class GroupOperation:
         success = all(r["success"] for r in results)
 
         self.state["overall_state"] = (
-            "success" if success else "failed"
+            "success" if success else "fail"
         )
 
         if not success:
             nodes_to_rollback = [ r["node"] for r in results if r["success"]] # rollback successful ones
             rollback_result = await self.rollback(operation, nodes_to_rollback)
             self.state["rollback_result"] = rollback_result
-
-        self.state["current_state"] = self.state["overall_state"]
+            rollback_success = all(r["success"] for r in rollback_result)
+            self.state["rollback"] = success
 
         return self.state
 
