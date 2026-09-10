@@ -37,42 +37,63 @@ class GroupOperation:
             return response
 
     async def process(self, method, node, response):
-        success = response.is_success
+        if method == "create":
+            if response.status_code == 201:
+                return {
+                    "node": node,
+                    "state": "created",
+                    "success": True,
+                }
 
-        if not success:
             get_response = await self.send_request("get", node)
 
-            if method == "create":
-                assert get_response.status_code == 404
+            if get_response.status_code == 404:
                 state = "not_created"
-
-            elif method == "delete":
-                assert get_response.status_code == 200
-                state = "not_deleted"
-
-        else:
-            if method == "create":
-                assert response.status_code == 201
+            elif get_response.status_code == 200:
                 state = "created"
+            else:
+                state = "unknown"
 
-            elif method == "delete":
-                assert response.status_code == 200
+            return {
+                "node": node,
+                "state": state,
+                "success": False,
+            }
+
+        if method == "delete":
+            if response.status_code == 200:
+                return {
+                    "node": node,
+                    "state": "deleted",
+                    "success": True,
+                }
+
+            get_response = await self.send_request("get", node)
+
+            if get_response.status_code == 404:
                 state = "deleted"
+            elif get_response.status_code == 200:
+                state = "not_deleted"
+            else:
+                state = "unknown"
+
+            return {
+                "node": node,
+                "state": state,
+                "success": False,
+            }
 
         return {
             "node": node,
-            "state": state,
-            "success": success,
+            "state": "unknown",
+            "success": False,
         }
 
 
     async def run(self, operation, nodes):
         self.state["operation"] = operation
 
-        tasks = [
-            asyncio.create_task(
-                self.send_request(operation, node)
-            )
+        tasks = [asyncio.create_task(self.send_request(operation, node))
             for node in nodes
         ]
 
@@ -80,13 +101,7 @@ class GroupOperation:
 
         for task in asyncio.as_completed(tasks):
             node, response = await task
-
-            result = await self.process(
-                operation,
-                node,
-                response,
-            )
-
+            result = await self.process(operation, node, response)
             results.append(result)
 
         self.state["operation_result"] = results
@@ -98,50 +113,26 @@ class GroupOperation:
         )
 
         if not success:
-            nodes_to_rollback = [
-                r["node"]
-                for r in results
-                if r["success"]
-            ]
-
-            rollback_result = await self.rollback(
-                operation,
-                nodes_to_rollback,
-            )
-
+            nodes_to_rollback = [ r["node"] for r in results if r["success"]] # rollback successful ones
+            rollback_result = await self.rollback(operation, nodes_to_rollback)
             self.state["rollback_result"] = rollback_result
 
         self.state["current_state"] = self.state["overall_state"]
 
         return self.state
 
-        
+
     async def rollback(self, operation, nodes):
-        rollback_operation = (
-            "delete" if operation == "create"
-            else "create"
-        )
-
+        rollback_operation = "delete" if operation == "create" else "create"
         self.state["rollback"] = rollback_operation
-
-        tasks = [
-            asyncio.create_task(
-                self.send_request(rollback_operation, node)
-            )
-            for node in nodes
-        ]
+        tasks = [asyncio.create_task(self.send_request(rollback_operation, node))
+                    for node in nodes]
 
         results = []
 
         for task in asyncio.as_completed(tasks):
             node, response = await task
-
-            result = await self.process(
-                rollback_operation,
-                node,
-                response,
-            )
-
+            result = await self.process(rollback_operation, node, response)
             results.append(result)
 
         return results
