@@ -77,9 +77,9 @@ Configure the API nodes and requested operations in `config.yaml`:
 
 ```yaml
 nodes:
-  - http://node1:8000
-  - http://node2:8000
-  - http://node3:8000
+  - node1:8000
+  - node2:8000
+  - node3:8000
 
 operations:
   - operation: create
