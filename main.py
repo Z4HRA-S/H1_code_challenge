@@ -214,7 +214,7 @@ async def recover_unknown_operations(engine):
                 session.commit()
                 total_result.append(result)
 
-    return total_results
+    return total_result
 
 
 def recovery_report(results):
@@ -346,7 +346,7 @@ async def main(config_path):
 
     for operation in config["operations"]:
         result = await run(
-            engine = engine
+            engine = engine,
             operation=operation["operation"],
             group_name=operation["group_name"],
             nodes=nodes,
