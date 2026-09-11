@@ -305,6 +305,8 @@ def report(results):
 
         if unknown_nodes:
             print(f"  Unknown  : {list(unknown_nodes)}")
+        else:
+            print(f"  Unknown  : 0")
 
     print("\n" + "=" * 50)
 
@@ -326,6 +328,10 @@ async def run(engine, operation, group_name, nodes):
                     "group_name": group_name,
                     "overall_state": "failed",
                     "error": "No available group found",
+                    
+                    "operation_result": [],
+                    "rollback": None,
+                    "rollback_result": [],
                 }
 
         group_operation = GroupOperation(group_id)
