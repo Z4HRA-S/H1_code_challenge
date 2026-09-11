@@ -23,10 +23,11 @@ class GroupOperation:
                 )
 
             elif method == "delete":
-                response = await client.delete(
-                    f"{node}/v1/group/",
-                    json={"groupId": self.group_id},
-                )
+                response = await client.request(
+                            "DELETE",
+                            f"{node}/v1/group/",
+                            json={"groupId": self.group_id},
+                        )
 
             elif method == "get":
                 response = await client.get(
