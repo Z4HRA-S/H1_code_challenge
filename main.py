@@ -11,6 +11,8 @@ from model import (
     GroupStatus,
 )
 import uuid
+import asyncio
+import yaml
 
 
 def get_last_group_id(session, group_name):
@@ -43,36 +45,6 @@ def register_nodes(session, nodes):
             session.add(Node(node_id=str(uuid.uuid4()), host=host))
 
     session.commit()
-
-
-async def main(operation, group_name, nodes):
-    engine = create_db()
-
-    with get_session(engine) as session:
-        register_nodes(session, nodes)
-
-        if operation == "create":
-            group_id = str(uuid.uuid4())
-
-        elif operation == "delete":
-            group_id = get_last_group_id(session, group_name)
-
-            if group_id is None:
-                return {
-                    "operation": operation,
-                    "group_name": group_name,
-                    "overall_state": "failed",
-                    "error": "No available group found",
-                }
-
-        group_operation = GroupOperation(group_id)
-        result = await group_operation.run(operation, nodes)
-
-        update_database(session, group_name, group_id, operation, result)
-
-        report(session, group_name, result)
-
-        return result
 
 def get_node_operation_status(state):
     if state in ("created", "deleted"):
@@ -154,5 +126,114 @@ def update_database(session, group_name, group_id, operation, result):
     session.commit()
 
 
-def report(session, group_name, result):
-    pass
+def report(results):
+    print("\n" + "=" * 50)
+    print("OPERATION REPORT")
+    print("=" * 50)
+
+    for i, result in enumerate(results, 1):
+        operation_results = result["operation_result"]
+        rollback_results = result["rollback_result"]
+
+        rollback_nodes = {
+            item["node"]
+            for item in rollback_results
+            if item["success"]
+        }
+
+        unknown_nodes = set()
+
+        for item in operation_results:
+            if item["node"] in rollback_nodes:
+                continue
+
+            if item["state"] == "unknown":
+                unknown_nodes.add(item["node"])
+
+        for item in rollback_results:
+            if not item["success"]:
+                unknown_nodes.add(item["node"])
+
+        success_count = sum(
+            item["success"]
+            for item in operation_results
+            if item["node"] not in rollback_nodes
+        )
+
+        fail_count = sum(
+            not item["success"]
+            for item in operation_results
+            if item["node"] not in rollback_nodes
+            and item["state"] != "unknown"
+        )
+
+        rollback_count = len(rollback_nodes)
+
+        print(f"\nOperation {i}: {result['operation']} - {result['group_name']}")
+        print(f"  Success  : {success_count}")
+        print(f"  Failed   : {fail_count}")
+        print(f"  Rollback : {rollback_count}")
+        print(f"  Overall  : {result['overall_state']}")
+
+        if unknown_nodes:
+            print(f"  Unknown  : {list(unknown_nodes)}")
+
+    print("\n" + "=" * 50)
+
+
+
+async def run(operation, group_name, nodes):
+    engine = create_db()
+
+    with get_session(engine) as session:
+        register_nodes(session, nodes)
+
+        if operation == "create":
+            group_id = str(uuid.uuid4())
+
+        elif operation == "delete":
+            group_id = get_last_group_id(session, group_name)
+
+            if group_id is None:
+                return {
+                    "operation": operation,
+                    "group_name": group_name,
+                    "overall_state": "failed",
+                    "error": "No available group found",
+                }
+
+        group_operation = GroupOperation(group_id)
+        result = await group_operation.run(operation, nodes)
+
+        update_database(session, group_name, group_id, operation, result)
+
+        return result
+
+
+def load_config(path):
+    with open(path, "r") as file:
+        return yaml.safe_load(file)
+
+
+async def main(config_path):
+    config = load_config(config_path)
+
+    nodes = config["nodes"]
+
+    results = []
+
+    for operation in config["operations"]:
+        result = await run(
+            operation=operation["operation"],
+            group_name=operation["group_name"],
+            nodes=nodes,
+        )
+        results.append(result)
+        
+    report(results)
+
+    return results
+
+
+if __name__ == "__main__":
+    asyncio.run(main("config.yaml"))
