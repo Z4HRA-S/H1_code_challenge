@@ -351,6 +351,7 @@ async def main(config_path):
             group_name=operation["group_name"],
             nodes=nodes,
         )
+        result["group_name"] = operation["group_name"]
         results.append(result)
 
     report(results)
