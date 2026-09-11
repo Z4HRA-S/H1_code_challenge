@@ -13,6 +13,7 @@ from model import (
 import uuid
 import asyncio
 import yaml
+import sys
 
 
 def get_last_group_id(session, group_name):
@@ -373,4 +374,4 @@ async def main(config_path):
 
 
 if __name__ == "__main__":
-    asyncio.run(main("config.yaml"))
+    asyncio.run(main(sys.argv[1] if len(sys.argv) > 1 else "config.yaml"))
