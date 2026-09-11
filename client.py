@@ -33,7 +33,7 @@ class GroupOperation:
                     f"{node}/v1/group/{self.group_id}/",
                 )
 
-            return response
+            return node, response
 
     async def process(self, method, node, response):
         if method == "create":
@@ -44,7 +44,7 @@ class GroupOperation:
                     "success": True,
                 }
 
-            get_response = await self.send_request("get", node)
+            _, get_response = await self.send_request("get", node)
 
             if get_response.status_code == 404:
                 state = "not_created"
@@ -68,7 +68,7 @@ class GroupOperation:
                     "success": True,
                 }
 
-            get_response = await self.send_request("get", node)
+            _, get_response = await self.send_request("get", node)
 
             if get_response.status_code == 404:
                 state = "deleted"
