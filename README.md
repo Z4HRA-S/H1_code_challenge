@@ -70,6 +70,17 @@ In a production architecture, database access should be provided through depende
 Database credentials and other environment-specific settings should also be provided through external configuration or Kubernetes Secrets rather than being kept in application configuration.
 
 
+## Design Inspiration
+
+The compensation and recovery design was inspired by the [Saga pattern](https://www.tothenew.com/blog/distributed-transactions-in-microservices-how-the-saga-pattern-solves-real-problems/), particularly the idea of using compensating operations instead of relying on distributed transactions.
+
+The implementation was adapted to the requirements of this assignment. Since each node performs the same operation independently, node operations are treated as independent tasks and are executed in parallel rather than as a sequential chain of business transactions.
+
+If an operation succeeds on some nodes but fails on others, successful nodes are compensated by applying the inverse operation. In addition, a separate recovery mechanism is provided for cases where the compensation itself fails. Unresolved node operations are persisted as `UNKNOWN` and can be retried later by the recovery flow.
+
+Therefore, the implementation follows the compensation principle of the Saga pattern, while adapting it to a parallel multi-node operation rather than a sequence of distributed business transactions.
+
+
 
 ### Configuration
 
