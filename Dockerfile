@@ -9,6 +9,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
 # Uncomment to run the local toy API before the client and Comment the CMD below:
-# CMD ["sh", "-c", "python toy_api.py & sleep 2 && python main.py"]
+#CMD ["sh", "-c", "python toy_api.py & sleep 2 && python main.py"]
 
 CMD ["python", "main.py"]
