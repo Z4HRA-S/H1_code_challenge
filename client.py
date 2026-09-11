@@ -18,20 +18,20 @@ class GroupOperation:
         async with httpx.AsyncClient() as client:
             if method == "create":
                 response = await client.post(
-                    f"{node}/v1/group/",
+                    f"http://{node}/v1/group/",
                     json={"groupId": self.group_id},
                 )
 
             elif method == "delete":
                 response = await client.request(
                             "DELETE",
-                            f"{node}/v1/group/",
+                            f"http://{node}/v1/group/",
                             json={"groupId": self.group_id},
                         )
 
             elif method == "get":
                 response = await client.get(
-                    f"{node}/v1/group/{self.group_id}/",
+                    f"http://{node}/v1/group/{self.group_id}/",
                 )
 
             return node, response
