@@ -1,5 +1,3 @@
-# toy_api.py
-
 import asyncio
 import random
 
