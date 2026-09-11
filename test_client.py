@@ -11,8 +11,8 @@ def assert_node_result(result):
     assert result["state"] in {
         "created",
         "deleted",
-        "not-created",
-        "not-deleted",
+        "not_created",
+        "not_deleted",
         "unknown",
     }
     assert isinstance(result["success"], bool)
@@ -61,11 +61,11 @@ async def test_send_request(method, http_method, path, status_code, monkeypatch)
     [
         ("create", 201, None, "created", True),
         ("create", 500, 200, "created", True),
-        ("create", 500, 404, "not-created", False),
+        ("create", 500, 404, "not_created", False),
         ("create", 500, 500, "unknown", False),
         ("delete", 200, None, "deleted", True),
         ("delete", 500, 404, "deleted", True),
-        ("delete", 500, 200, "not-deleted", False),
+        ("delete", 500, 200, "not_deleted", False),
         ("delete", 500, 500, "unknown", False),
     ],
 )
