@@ -221,7 +221,7 @@ def recovery_report(results):
     print("\n" + "=" * 50)
     print("RECOVERY REPORT")
     print("=" * 50)
-
+    print(result)
     for i, result in enumerate(results, 1):
         rollback_results = result["rollback_result"]
 
