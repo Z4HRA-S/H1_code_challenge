@@ -1,5 +1,15 @@
 from group_operation import GroupOperation
-from model import create_db, get_session, Group, Node
+from model import create_db, get_session
+from model import (
+    Operation,
+    NodeOperation,
+    Group,
+    Node,
+    OperationType,
+    OverallStatus,
+    NodeOperationStatus,
+    GroupStatus,
+)
 import uuid
 
 
@@ -64,9 +74,84 @@ async def main(operation, group_name, nodes):
 
         return result
 
+def get_node_operation_status(state):
+    if state in ("created", "deleted"):
+        return NodeOperationStatus.SUCCESS
+    elif state in ("not-created", "not-deleted"):
+        return NodeOperationStatus.FAILED
+    else:
+        return NodeOperationStatus.UNKNOWN
 
 def update_database(session, group_name, group_id, operation, result):
-    pass
+    if result["overall_state"]:
+        overall_status = OverallStatus.SUCCESS
+    elif result["rollback"]:
+        overall_status = OverallStatus.FAIL
+    else:
+        overall_status = OverallStatus.UNKNOWN
+
+    db_operation = Operation(
+        group_id=group_id,
+        operation=OperationType(operation),
+        overall_status=overall_status,
+    )
+    session.add(db_operation)
+    session.flush()
+
+    node_results = {
+        item["node"]: {**item, "status": get_node_operation_status(item["state"])}
+        for item in result["operation_result"]
+    }
+
+    for item in result["rollback_result"]:
+        node_operation_status = NodeOperationStatus.ROLLBACKED if item["success"] else NodeOperationStatus.UNKNOWN
+        node_results[item["node"]] = {**item, "status": node_operation_status}
+
+    for host, item in node_results.items():
+        node = (
+            session.query(Node)
+            .filter(Node.host == host)
+            .first()
+        )
+
+        if node is None:
+            continue
+
+        session.add(
+            NodeOperation(
+                node_id=node.node_id,
+                operation_id=db_operation.operation_id,
+                status=item["status"],
+            )
+        )
+
+    if operation == "create":
+        if any(item["success"] for item in result["operation_result"]):
+            version = get_next_version(session, group_name)
+
+            session.add(
+                Group(
+                    group_id=group_id,
+                    group_name=group_name,
+                    version=version,
+                    status=(
+                        GroupStatus.AVAILABLE
+                        if result["overall_state"]
+                        else GroupStatus.UNAVAILABLE
+                    ),
+                )
+            )
+
+    elif operation == "delete":
+        group = session.get(Group, group_id)
+
+        if group:
+            if result["overall_state"]:
+                session.delete(group)
+            else:
+                group.status = GroupStatus.UNAVAILABLE
+
+    session.commit()
 
 
 def report(session, group_name, result):
