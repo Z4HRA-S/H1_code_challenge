@@ -18,9 +18,9 @@ spec:
           image: api-consumer:latest
           imagePullPolicy: IfNotPresent
 
-          command:
-            - python
-            - main.py
+          #command:
+          #  - python
+          #  - main.py
 
           volumeMounts:
             - name: config
