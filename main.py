@@ -128,90 +128,91 @@ def update_database(session, group_name, group_id, operation, result):
 from collections import defaultdict
 
 
-async def recover_unknown_operations(session):
-    unknown_operations = (
-        session.query(
-            Operation.operation_id,
-            Operation.group_id,
-            Operation.operation,
-            Node.host,
-        )
-        .join(
-            NodeOperation,
-            Operation.operation_id == NodeOperation.operation_id,
-        )
-        .join(
-            Node,
-            Node.node_id == NodeOperation.node_id,
-        )
-        .filter(
-            Operation.overall_status == OverallStatus.UNKNOWN,
-            NodeOperation.status == NodeOperationStatus.UNKNOWN,
-        )
-        .all()
-    )
-
-    groups = defaultdict(lambda: defaultdict(lambda: {
-        "operation": None,
-        "nodes": [],
-    }))
-
-    for operation_id, group_id, operation, host in unknown_operations:
-        groups[group_id][operation_id]["operation"] = operation
-        groups[group_id][operation_id]["nodes"].append(host)
-    
-    total_result=[]
-
-    for group_id, operations in groups.items():
-        group_operation = GroupOperation(group_id)
-
-        for operation_id, data in operations.items():
-            rollback_operation = (
-                "delete"
-                if data["operation"] == OperationType.CREATE
-                else "create"
+async def recover_unknown_operations(engine):
+    with get_session(engine) as session:
+        unknown_operations = (
+            session.query(
+                Operation.operation_id,
+                Operation.group_id,
+                Operation.operation,
+                Node.host,
             )
-
-            result = await group_operation.rollback(
-                rollback_operation,
-                data["nodes"],
+            .join(
+                NodeOperation,
+                Operation.operation_id == NodeOperation.operation_id,
             )
+            .join(
+                Node,
+                Node.node_id == NodeOperation.node_id,
+            )
+            .filter(
+                Operation.overall_status == OverallStatus.UNKNOWN,
+                NodeOperation.status == NodeOperationStatus.UNKNOWN,
+            )
+            .all()
+        )
 
-            for item in result:
-                node_operation = (
+        groups = defaultdict(lambda: defaultdict(lambda: {
+            "operation": None,
+            "nodes": [],
+        }))
+
+        for operation_id, group_id, operation, host in unknown_operations:
+            groups[group_id][operation_id]["operation"] = operation
+            groups[group_id][operation_id]["nodes"].append(host)
+        
+        total_result=[]
+
+        for group_id, operations in groups.items():
+            group_operation = GroupOperation(group_id)
+
+            for operation_id, data in operations.items():
+                rollback_operation = (
+                    "delete"
+                    if data["operation"] == OperationType.CREATE
+                    else "create"
+                )
+
+                result = await group_operation.rollback(
+                    rollback_operation,
+                    data["nodes"],
+                )
+
+                for item in result:
+                    node_operation = (
+                        session.query(NodeOperation)
+                        .join(Node, Node.node_id == NodeOperation.node_id)
+                        .filter(
+                            NodeOperation.operation_id == operation_id,
+                            Node.host == item["node"],
+                        )
+                        .first()
+                    )
+
+                    if node_operation is None:
+                        continue
+
+                    node_operation.status = (
+                        NodeOperationStatus.ROLLBACKED
+                        if item["success"]
+                        else NodeOperationStatus.UNKNOWN
+                    )
+
+                remaining_unknown = (
                     session.query(NodeOperation)
-                    .join(Node, Node.node_id == NodeOperation.node_id)
                     .filter(
                         NodeOperation.operation_id == operation_id,
-                        Node.host == item["node"],
+                        NodeOperation.status == NodeOperationStatus.UNKNOWN,
                     )
-                    .first()
+                    .count()
                 )
 
-                if node_operation is None:
-                    continue
+                if remaining_unknown == 0:
+                    operation_record = session.get(Operation, operation_id)
+                    operation_record.overall_status = OverallStatus.FAIL
 
-                node_operation.status = (
-                    NodeOperationStatus.ROLLBACKED
-                    if item["success"]
-                    else NodeOperationStatus.UNKNOWN
-                )
-
-            remaining_unknown = (
-                session.query(NodeOperation)
-                .filter(
-                    NodeOperation.operation_id == operation_id,
-                    NodeOperation.status == NodeOperationStatus.UNKNOWN,
-                )
-                .count()
-            )
-
-            if remaining_unknown == 0:
-                operation_record = session.get(Operation, operation_id)
-                operation_record.overall_status = OverallStatus.FAIL
-
-            session.commit()
-            total_result.append(result)
+                session.commit()
+                total_result.append(result)
 
     return total_results
 
@@ -305,9 +306,7 @@ def report(results):
 
 
 
-async def run(operation, group_name, nodes):
-    engine = create_db()
-
+async def run(engine, operation, group_name, nodes):
     with get_session(engine) as session:
         register_nodes(session, nodes)
 
@@ -340,13 +339,14 @@ def load_config(path):
 
 async def main(config_path):
     config = load_config(config_path)
-
+    engine = create_db()
     nodes = config["nodes"]
 
     results = []
 
     for operation in config["operations"]:
         result = await run(
+            engine = engine
             operation=operation["operation"],
             group_name=operation["group_name"],
             nodes=nodes,
@@ -356,7 +356,7 @@ async def main(config_path):
 
     report(results)
 
-    recovered_results = await recover_unknown_operations(session)
+    recovered_results = await recover_unknown_operations(engine)
     recovery_report(recovered_results)
 
     return results
