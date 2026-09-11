@@ -118,14 +118,13 @@ class GroupOperation:
             rollback_result = await self.rollback(operation, nodes_to_rollback)
             self.state["rollback_result"] = rollback_result
             rollback_success = all(r["success"] for r in rollback_result)
-            self.state["rollback"] = success
+            self.state["rollback"] = rollback_success
 
         return self.state
 
 
     async def rollback(self, operation, nodes):
         rollback_operation = "delete" if operation == "create" else "create"
-        self.state["rollback"] = rollback_operation
         tasks = [asyncio.create_task(self.send_request(rollback_operation, node))
                     for node in nodes]
 
