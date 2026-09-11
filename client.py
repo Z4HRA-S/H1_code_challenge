@@ -110,7 +110,7 @@ class GroupOperation:
         success = all(r["success"] for r in results)
 
         self.state["overall_state"] = (
-            "success" if success else "fail"
+            True if success else False
         )
 
         if not success:
