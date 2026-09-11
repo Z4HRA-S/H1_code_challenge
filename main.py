@@ -212,8 +212,13 @@ async def recover_unknown_operations(engine):
                     operation_record.overall_status = OverallStatus.FAIL
 
                 session.commit()
-                total_result.append(result)
-
+                total_result.append({
+                        "operation": data["operation"],
+                        "group_id": group_id,
+                        "operation_id": operation_id,
+                        "rollback_result": result,
+                        "overall_state": all(item["success"] for item in result),
+                    })
     return total_result
 
 
@@ -221,7 +226,6 @@ def recovery_report(results):
     print("\n" + "=" * 50)
     print("RECOVERY REPORT")
     print("=" * 50)
-    print(result)
     for i, result in enumerate(results, 1):
         rollback_results = result["rollback_result"]
 
