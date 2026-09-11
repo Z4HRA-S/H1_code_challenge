@@ -1,4 +1,4 @@
-from group_operation import GroupOperation
+from client import GroupOperation
 from model import create_db, get_session
 from model import (
     Operation,
