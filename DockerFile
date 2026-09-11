@@ -1,0 +1,14 @@
+FROM python:3.12-slim
+
+WORKDIR /app
+
+COPY requirements.txt .
+
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY . .
+
+# Uncomment to run the local toy API before the client:
+# CMD ["sh", "-c", "python toy_api.py & sleep 2"]
+
+CMD ["python", "main.py"]
